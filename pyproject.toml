@@ -1,0 +1,35 @@
+[build-system]
+requires = [
+    "setuptools>=68",
+    "wheel",
+]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "croco-tools"
+version = "0.1.0"
+description = "Modern xarray-based analysis tools for CROCO"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "dask[array]>=2023.1",
+    "netCDF4>=1.6",
+    "numpy>=1.24",
+    "xarray>=2023.1",
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest>=7",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = [
+    "croco_tools*",
+]
+
+[tool.pytest.ini_options]
+testpaths = [
+    "tests",
+]

@@ -1,0 +1,69 @@
+Metadata-Version: 2.4
+Name: croco-tools
+Version: 0.1.0
+Summary: Modern xarray-based analysis tools for CROCO
+Requires-Python: >=3.10
+Description-Content-Type: text/markdown
+Requires-Dist: dask[array]>=2023.1
+Requires-Dist: netCDF4>=1.6
+Requires-Dist: numpy>=1.24
+Requires-Dist: xarray>=2023.1
+Provides-Extra: test
+Requires-Dist: pytest>=7; extra == "test"
+
+# croco_tools
+
+A modern, xarray-first package for CROCO analysis.
+
+## Current scope
+
+Version 0.1 provides:
+
+- opening one or multiple CROCO history files;
+- attaching static grid variables;
+- CROCO C-grid interpolation;
+- velocity rotation to east and north;
+- physical depths for both vertical transformations;
+- interpolation from sigma levels to fixed depths;
+- an xarray Dataset accessor;
+- analytical tests for the core operations.
+
+## Installation
+
+```bash
+python -m pip install -e ".[test]"
+pytest -q
+```
+
+## Example
+
+```python
+import croco_tools
+
+dataset = croco_tools.open_croco(
+    "HIS/rio1km_his.nc",
+    grid="CROCO_FILES/rio1km_grd.nc",
+)
+
+z_rho, z_w = dataset.croco.depths()
+
+u_east, v_north = dataset.croco.velocity()
+
+temperature_100m = dataset.croco.to_depth(
+    "temp",
+    depths=-100.0,
+)
+```
+
+## Style
+
+The code uses:
+
+- short lines;
+- two blank lines between top-level definitions;
+- descriptive names;
+- NumPy-style docstrings;
+- xarray-aware arithmetic;
+- no GUI dependencies;
+- no broad exception suppression;
+- no silent coordinate deletion.
