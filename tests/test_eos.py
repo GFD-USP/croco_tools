@@ -75,7 +75,7 @@ def test_density_anomaly_changes_with_rho0() -> None:
     # rho = r00 - rho0 at the surface, so the difference is exactly
     # rho0_b - rho0_a.
     np.testing.assert_allclose(
-        float(rho_b) - float(rho_a),
+        rho_b.item() - rho_a.item(),
         1025.0 - 1000.0,
         rtol=1.0e-10,
     )

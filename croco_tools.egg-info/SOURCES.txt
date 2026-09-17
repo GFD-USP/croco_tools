@@ -16,5 +16,12 @@ croco_tools.egg-info/SOURCES.txt
 croco_tools.egg-info/dependency_links.txt
 croco_tools.egg-info/requires.txt
 croco_tools.egg-info/top_level.txt
+tests/test_accessor.py
+tests/test_eos.py
+tests/test_geo.py
 tests/test_grid.py
+tests/test_io.py
+tests/test_kinematics.py
+tests/test_section.py
+tests/test_stratification.py
 tests/test_vertical.py

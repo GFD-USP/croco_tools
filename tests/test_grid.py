@@ -152,16 +152,26 @@ def test_rho_to_u_then_u_to_rho_interior_is_consistent() -> None:
 
 
 def test_psi_to_rho_pads_to_original_rho_shape() -> None:
+    # psi_to_rho's own interior averaging step needs a psi grid of at
+    # least 2x2 to produce a non-empty interior before padding -- a
+    # real CROCO grid is always far larger than this, but a bare 2x2
+    # rho grid (1x1 psi) is a genuine degenerate edge case, not
+    # something to test here. Use a 4x4 rho grid instead.
+    #
+    # Size bookkeeping: rho_to_psi shrinks n -> n-1 (4-point average).
+    # psi_to_rho shrinks that by 1 again for its own interior average
+    # (n-1 -> n-2), then pads by 1 on each side (n-2 -> n). Net effect:
+    # psi_to_rho(rho_to_psi(field)) has exactly the same shape as field.
     field = xr.DataArray(
-        [[0.0, 2.0], [4.0, 6.0]],
+        np.arange(16.0).reshape(4, 4),
         dims=("eta_rho", "xi_rho"),
     )
     psi = rho_to_psi(field)
 
     back = psi_to_rho(psi)
 
-    assert back.sizes["eta_rho"] == field.sizes["eta_rho"] + 1
-    assert back.sizes["xi_rho"] == field.sizes["xi_rho"] + 1
+    assert back.sizes["eta_rho"] == field.sizes["eta_rho"]
+    assert back.sizes["xi_rho"] == field.sizes["xi_rho"]
 
 
 # ---------------------------------------------------------------------------

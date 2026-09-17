@@ -694,7 +694,7 @@ def add_horizontal_metrics(ds: xr.Dataset) -> xr.Dataset:
     bare_grid = Grid(
         ds,
         coords=_XGCM_COORDS,
-        boundary={"X": "extend", "Y": "extend"},
+        padding={"X": "extend", "Y": "extend"},
         autoparse_metadata=False,
     )
 
@@ -788,7 +788,7 @@ def build_xgcm_grid(ds: xr.Dataset) -> Grid:
         ds,
         coords=_XGCM_COORDS,
         metrics=metrics,
-        boundary={"X": "extend", "Y": "extend"},
+        padding={"X": "extend", "Y": "extend"},
         autoparse_metadata=False,
     )
 
