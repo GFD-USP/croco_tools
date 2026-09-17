@@ -379,16 +379,30 @@ def horizontal_density_gradient(
         return drho_dx, drho_dy
 
     if grid == "u":
+        # Move drho_dy from (eta_v, xi_rho) to (eta_rho, xi_u) -- both
+        # axes need to move, not just X.
         drho_dy = xgrid.interp(
             drho_dy,
             "X",
             padding="extend",
         )
+        drho_dy = xgrid.interp(
+            drho_dy,
+            "Y",
+            padding="extend",
+        )
 
     elif grid == "v":
+        # Move drho_dx from (eta_rho, xi_u) to (eta_v, xi_rho) -- both
+        # axes need to move, not just Y.
         drho_dx = xgrid.interp(
             drho_dx,
             "Y",
+            padding="extend",
+        )
+        drho_dx = xgrid.interp(
+            drho_dx,
+            "X",
             padding="extend",
         )
 

@@ -144,8 +144,14 @@ def test_interpolate_section_recovers_linear_field_exactly() -> None:
     target_lat = np.array([-19.85, -19.7, -19.5, -19.3, -19.15])
     track = Transect.from_coordinates(target_lon, target_lat)
 
+    # padding=1.0: interpolate_section's own default padding (0.1 deg)
+    # crops the source grid to the track's bounding box, which -- given
+    # the track sits close to this small test grid's own edges -- was
+    # excluding the outermost grid rows and leaving some target points
+    # outside the cropped convex hull. A generous explicit padding
+    # keeps the whole (tiny) test grid in play.
     section = interpolate_section(
-        field, track, longitude=longitude, latitude=latitude
+        field, track, longitude=longitude, latitude=latitude, padding=1.0
     )
 
     expected = target_lon - lon2d.min()

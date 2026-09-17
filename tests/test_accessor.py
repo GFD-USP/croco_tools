@@ -18,10 +18,15 @@ from croco_tools.vertical import compute_depths, interpolate_to_depth
 
 
 def _dataset_with_depths_and_velocity() -> xr.Dataset:
+    # 3x3 rho grid (xi_u=2, eta_v=2) -- u_to_rho/v_to_rho (used inside
+    # rotate_velocity) need at least 2 points along the staggered
+    # dimension for their own interior-averaging step to be non-empty;
+    # a 1x1 grid is degenerate for them (same class of edge case as
+    # psi_to_rho's minimum-size requirement, see test_grid.py).
     return xr.Dataset(
         {
-            "h": xr.DataArray([[100.0]], dims=("eta_rho", "xi_rho")),
-            "zeta": xr.DataArray([[0.0]], dims=("eta_rho", "xi_rho")),
+            "h": xr.DataArray(np.full((3, 3), 100.0), dims=("eta_rho", "xi_rho")),
+            "zeta": xr.DataArray(np.zeros((3, 3)), dims=("eta_rho", "xi_rho")),
             "hc": xr.DataArray(20.0),
             "Vtransform": xr.DataArray(2),
             "sc_r": xr.DataArray([-0.75, -0.25], dims=("s_rho",)),
@@ -29,11 +34,12 @@ def _dataset_with_depths_and_velocity() -> xr.Dataset:
             "Cs_r": xr.DataArray([-0.75, -0.25], dims=("s_rho",)),
             "Cs_w": xr.DataArray([-1.0, -0.5, 0.0], dims=("s_w",)),
             "temp": xr.DataArray(
-                [[[1.0, 2.0]]], dims=("eta_rho", "xi_rho", "s_rho")
+                np.broadcast_to([1.0, 2.0], (3, 3, 2)).copy(),
+                dims=("eta_rho", "xi_rho", "s_rho"),
             ),
-            "u": xr.DataArray(np.ones((1, 1)), dims=("eta_rho", "xi_u")),
-            "v": xr.DataArray(np.zeros((1, 1)), dims=("eta_v", "xi_rho")),
-            "angle": xr.DataArray(np.zeros((1, 1)), dims=("eta_rho", "xi_rho")),
+            "u": xr.DataArray(np.ones((3, 2)), dims=("eta_rho", "xi_u")),
+            "v": xr.DataArray(np.zeros((2, 3)), dims=("eta_v", "xi_rho")),
+            "angle": xr.DataArray(np.zeros((3, 3)), dims=("eta_rho", "xi_rho")),
         }
     )
 

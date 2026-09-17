@@ -78,7 +78,7 @@ normalized output is masked to avoid blowing up near the equator.
 |---|---|---|
 | `density_anomaly` | ✅ implemented, tested | Direct translation of CROCO's `rho_eos.F` (both the `split_eos=False` and `split_eos=True` branches). **Masking here multiplies by `mask_rho` (0/1) → masked cells become exactly `0.0`, not `NaN`** — this differs from the `.where()`-based NaN masking in `kinematics.py`. Worth knowing if you're chaining these together. |
 | `buoyancy_frequency` | ✅ implemented, tested | Fixed — previously called an undefined `croco_density`; now correctly calls `density_anomaly`. See the changelog note in [Known Issues](#known-issues). |
-| `horizontal_density_gradient` | ✅ implemented, tested | Native derivative locations: `dρ/dx` at u, `dρ/dy` at v (`xgrid.derivative(..., boundary="extend")`). `grid="rho"` additionally masks the outermost row/column, since centered rho-point gradients are undefined there. **Moved here from the former `stratification.py`** (now a backward-compat re-export shim) so all density-related code lives in one place. |
+| `horizontal_density_gradient` | ✅ implemented, tested | Native derivative locations: `dρ/dx` at u, `dρ/dy` at v (`xgrid.derivative(..., padding="extend")`). `grid="rho"` additionally masks the outermost row/column, since centered rho-point gradients are undefined there. `grid="u"`/`"v"` had a shape-mismatch bug, now fixed (see Known Issues #6). **Moved here from the former `stratification.py`** (now a backward-compat re-export shim) so all density-related code lives in one place. |
 | `density_gradient_magnitude` | ✅ implemented, tested | `np.hypot(dρ/dx, dρ/dy)` after moving both components to the requested location. Also moved here from `stratification.py`. |
 
 `stratification.py` still exists and still works — it now just
@@ -154,8 +154,8 @@ are not in tension with each other.
 ## 3. Known issues
 
 These are genuine bugs/inconsistencies found while reading the source.
-Items 1, 2, 3, and 5 have since been **fixed** (each with your explicit
-go-ahead); 4 is still open, flagged only.
+Items 1, 2, 3, 5, and 6 have since been **fixed** (each with your
+explicit go-ahead); 4 is still open, flagged only.
 
 1. ~~**`buoyancy_frequency` is broken (`NameError` on every call).**~~
    **Fixed.** `eos.py` called `croco_density(...)`, an undefined name —
@@ -202,6 +202,21 @@ go-ahead); 4 is still open, flagged only.
    `"extrapolate"` boundary type). This is why `xgcm>=0.10` is now
    pinned in `pyproject.toml` (item 3) — the code no longer works with
    xgcm 0.9.x, which doesn't understand `padding=` at all.
+
+6. ~~**`horizontal_density_gradient`'s `grid="u"`/`grid="v"` outputs had
+   mismatched shapes** (a real bug found once tests actually ran
+   against real xgcm/xarray, not something in the docs pass).~~
+   **Fixed.** For `grid="u"`, only `drho_dy` needs to move — from its
+   native `(eta_v, xi_rho)` to `(eta_rho, xi_u)` — but the code only
+   interpolated it along `"X"` (`xi_rho → xi_u`), leaving it at
+   `(eta_v, xi_u)` instead of `(eta_rho, xi_u)`: `drho_dx` and
+   `drho_dy` came back with different shapes (e.g. `(5, 5)` vs.
+   `(4, 5)` on a small test grid), which would silently break any
+   `np.hypot`/elementwise combination of the two downstream. Same
+   issue, mirrored, for `grid="v"`. Fixed by adding the missing second
+   `xgrid.interp(...)` call in each branch. This predates the move
+   into `eos.py` — it was already present in the original
+   `stratification.py` — the move just carried it along unchanged.
 
 ---
 
@@ -259,6 +274,19 @@ package doesn't yet have an opinion on packaging up.
   CROCO curvilinear grids are never this regular anyway) and an
   exactly-linear test field, so exact recovery no longer depends on
   target points coinciding with source grid nodes.
+- A second real run turned up three more issues: `test_accessor.py`'s
+  synthetic dataset used a 1x1 rho grid, which is degenerate for
+  `rotate_velocity`'s internal `u_to_rho`/`v_to_rho` calls (same class
+  of edge case as `psi_to_rho`'s minimum-size requirement above) —
+  enlarged to 3x3. `test_eos.py`'s `rho0`-comparison test called
+  `float()` on a shape-`(1,)` array, which changed from implicit to a
+  hard `TypeError` in numpy 2.x — switched to `.item()`, which handles
+  any single-element shape regardless of numpy version. And the
+  `interpolate_section` test's target track sat close enough to the
+  small test grid's edges that `interpolate_section`'s own default
+  `padding=0.1` degree crop excluded the outermost grid rows, putting
+  some targets outside the cropped convex hull — passed an explicit,
+  generous `padding=1.0` to keep the whole (tiny) test grid in play.
 
 - **This test suite was written and read through carefully, but could
   not be executed in the environment used to write it** — no network
