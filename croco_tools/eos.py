@@ -366,13 +366,13 @@ def horizontal_density_gradient(
     drho_dx = xgrid.derivative(
         density,
         "X",
-        boundary="extend",
+        padding="extend",
     )
 
     drho_dy = xgrid.derivative(
         density,
         "Y",
-        boundary="extend",
+        padding="extend",
     )
 
     if grid == "native":
@@ -382,38 +382,38 @@ def horizontal_density_gradient(
         drho_dy = xgrid.interp(
             drho_dy,
             "X",
-            boundary="extend",
+            padding="extend",
         )
 
     elif grid == "v":
         drho_dx = xgrid.interp(
             drho_dx,
             "Y",
-            boundary="extend",
+            padding="extend",
         )
 
     elif grid == "psi":
         drho_dx = xgrid.interp(
             drho_dx,
             "Y",
-            boundary="extend",
+            padding="extend",
         )
         drho_dy = xgrid.interp(
             drho_dy,
             "X",
-            boundary="extend",
+            padding="extend",
         )
 
     elif grid == "rho":
         drho_dx = xgrid.interp(
             drho_dx,
             "X",
-            boundary="extend",
+            padding="extend",
         )
         drho_dy = xgrid.interp(
             drho_dy,
             "Y",
-            boundary="extend",
+            padding="extend",
         )
 
         # Centered rho-point gradients are undefined at the external

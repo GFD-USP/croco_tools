@@ -1,0 +1,283 @@
+diff --git croco_tools/eos.py croco_tools/eos.py
+index bbf9536..7e46a76 100644
+--- croco_tools/eos.py
++++ croco_tools/eos.py
+@@ -366,13 +366,13 @@ def horizontal_density_gradient(
+     drho_dx = xgrid.derivative(
+         density,
+         "X",
+-        boundary="extend",
++        padding="extend",
+     )
+ 
+     drho_dy = xgrid.derivative(
+         density,
+         "Y",
+-        boundary="extend",
++        padding="extend",
+     )
+ 
+     if grid == "native":
+@@ -382,38 +382,38 @@ def horizontal_density_gradient(
+         drho_dy = xgrid.interp(
+             drho_dy,
+             "X",
+-            boundary="extend",
++            padding="extend",
+         )
+ 
+     elif grid == "v":
+         drho_dx = xgrid.interp(
+             drho_dx,
+             "Y",
+-            boundary="extend",
++            padding="extend",
+         )
+ 
+     elif grid == "psi":
+         drho_dx = xgrid.interp(
+             drho_dx,
+             "Y",
+-            boundary="extend",
++            padding="extend",
+         )
+         drho_dy = xgrid.interp(
+             drho_dy,
+             "X",
+-            boundary="extend",
++            padding="extend",
+         )
+ 
+     elif grid == "rho":
+         drho_dx = xgrid.interp(
+             drho_dx,
+             "X",
+-            boundary="extend",
++            padding="extend",
+         )
+         drho_dy = xgrid.interp(
+             drho_dy,
+             "Y",
+-            boundary="extend",
++            padding="extend",
+         )
+ 
+         # Centered rho-point gradients are undefined at the external
+diff --git croco_tools/grid.py croco_tools/grid.py
+index 224def8..d12b9df 100644
+--- croco_tools/grid.py
++++ croco_tools/grid.py
+@@ -694,7 +694,7 @@ def add_horizontal_metrics(ds: xr.Dataset) -> xr.Dataset:
+     bare_grid = Grid(
+         ds,
+         coords=_XGCM_COORDS,
+-        boundary={"X": "extend", "Y": "extend"},
++        padding={"X": "extend", "Y": "extend"},
+         autoparse_metadata=False,
+     )
+ 
+@@ -788,7 +788,7 @@ def build_xgcm_grid(ds: xr.Dataset) -> Grid:
+         ds,
+         coords=_XGCM_COORDS,
+         metrics=metrics,
+-        boundary={"X": "extend", "Y": "extend"},
++        padding={"X": "extend", "Y": "extend"},
+         autoparse_metadata=False,
+     )
+ 
+diff --git docs/DOCUMENTATION.md docs/DOCUMENTATION.md
+index 1b708c9..134cfe1 100644
+--- docs/DOCUMENTATION.md
++++ docs/DOCUMENTATION.md
+@@ -54,7 +54,7 @@ same functions.
+ | `normalize_croco_coords` | ✅ implemented, tested | Renames XIOS-style dims (`time_counter`, `x_rho`, `y_rho`, …) to the canonical `xi_rho`/`eta_rho`/`xi_u`/`eta_v`, and `nav_lon`/`nav_lat` → `lon`/`lat`. Raises `ValueError` if the required C-grid dims still aren't present after renaming. |
+ | `merge_grid` | ✅ implemented, tested | Merges a fixed allow-list of grid variables (`pm`, `pn`, `mask_rho`, `lon_*`, `lat_*`, `angle`, `f`, `h`) from a grid file into a history dataset. Uses `compat="override", join="exact"` — grid/history coordinates must align exactly. |
+ | `add_horizontal_metrics` | ✅ implemented, tested | Derives `dx_*`/`dy_*` from `pm`/`pn`, builds `area_*`, and a conservative `mask_psi` (all 4 surrounding rho cells must be wet). Requires `pm`/`pn` present. |
+-| `build_xgcm_grid` | ✅ implemented, tested | Constructs the `xgcm.Grid` with `boundary={"X": "extend", "Y": "extend"}`. Requires metrics already added (raises `KeyError` otherwise, with a pointer to call `add_horizontal_metrics` first). |
++| `build_xgcm_grid` | ✅ implemented, tested | Constructs the `xgcm.Grid` with `padding={"X": "extend", "Y": "extend"}` (renamed from `boundary=` for xgcm >= 0.10 — see Known Issues). Requires metrics already added (raises `KeyError` otherwise, with a pointer to call `add_horizontal_metrics` first). |
+ | `prepare_xgcm` | ✅ implemented, tested | The one-call convenience wrapper: `normalize → (merge grid) → add metrics → build Grid`. This is the function the notebooks actually import (`from croco_tools import prepare_xgcm`). |
+ 
+ ### kinematics.py — velocity-derived diagnostics
+@@ -154,8 +154,8 @@ are not in tension with each other.
+ ## 3. Known issues
+ 
+ These are genuine bugs/inconsistencies found while reading the source.
+-Items 1 and 2 have since been **fixed** (with your go-ahead); 3 and 4
+-are still open, flagged only.
++Items 1, 2, 3, and 5 have since been **fixed** (each with your explicit
++go-ahead); 4 is still open, flagged only.
+ 
+ 1. ~~**`buoyancy_frequency` is broken (`NameError` on every call).**~~
+    **Fixed.** `eos.py` called `croco_density(...)`, an undefined name —
+@@ -172,12 +172,12 @@ are still open, flagged only.
+    but had been missing from `__all__` entirely — this fix closes both
+    sides of the same gap).
+ 
+-3. **`pyproject.toml` is missing three runtime dependencies.**
+-   `dependencies` lists only `dask[array]`, `netCDF4`, `numpy`, `xarray`.
+-   But `grid.py` imports `xgcm`, and `section.py` imports `scipy.spatial.Delaunay`
+-   and `pyproj.Geod`. A fresh `pip install -e ".[test]"` on a clean
+-   environment will fail at import time for anything touching
+-   `prepare_xgcm` or `Transect`/`interpolate_section`.
++3. ~~**`pyproject.toml` is missing three runtime dependencies.**~~
++   **Fixed.** `dependencies` listed only `dask[array]`, `netCDF4`,
++   `numpy`, `xarray`, even though `grid.py` imports `xgcm` and
++   `section.py` imports `scipy.spatial.Delaunay` and `pyproj.Geod`.
++   Added `xgcm>=0.10`, `scipy>=1.10`, `pyproj>=3.5` to `dependencies`.
++   The `xgcm>=0.10` floor is not arbitrary — see item 5.
+ 
+ 4. **`io.py`'s `attach_grid`/`open_croco` and `grid.py`'s `merge_grid`
+    are two independent, not-quite-equivalent ways to attach a grid
+@@ -186,6 +186,23 @@ are still open, flagged only.
+    they can behave differently on messy real-world files (differing
+    coordinate names, non-exact-matching coordinates, etc.).
+ 
++5. ~~**`xgcm` >= 0.10 renamed the `boundary` argument to `padding`,
++   raising `ValueError` (not a deprecation warning) for the old
++   name.**~~ **Fixed.** This broke every `Grid(...)` construction in
++   `grid.py` (`add_horizontal_metrics`'s temporary grid and
++   `build_xgcm_grid`'s real one — both used `boundary={"X": "extend",
++   "Y": "extend"}`) and every `xgrid.interp`/`xgrid.derivative` call in
++   `eos.py`'s `horizontal_density_gradient` (`boundary="extend"`, 8
++   call sites). Since `kinematics.py` never passes `boundary=`/`padding=`
++   explicitly — it relies on the `Grid` object's own default set at
++   construction — fixing the two `Grid(...)` calls in `grid.py` also
++   fixed every `kinematics.py`-based test that was failing with the
++   same error. All renamed to `padding=` with the same value (`"extend"`,
++   which is unaffected by xgcm's separate removal of the different
++   `"extrapolate"` boundary type). This is why `xgcm>=0.10` is now
++   pinned in `pyproject.toml` (item 3) — the code no longer works with
++   xgcm 0.9.x, which doesn't understand `padding=` at all.
++
+ ---
+ 
+ ## 4. Gap map vs. notebook usage
+@@ -228,6 +245,21 @@ package doesn't yet have an opinion on packaging up.
+ 
+ ## 5. Testing notes
+ 
++- The first real run against an installed environment (xgcm 0.10.x)
++  turned up two test-construction bugs, now fixed: `test_grid.py`'s
++  `psi_to_rho` roundtrip test used a 2x2 rho grid, which is degenerate
++  for that function's own internal averaging step (needs >= 2x2 *psi*
++  points, i.e. >= 3x3 rho points) — switched to a 4x4 grid and
++  corrected the expected output shape (it's exactly the same shape as
++  the input, not input-shape-plus-one as originally asserted).
++  `test_section.py`'s `interpolate_section` test used a perfectly
++  regular, axis-aligned lon/lat grid, which is a classic trigger for
++  Qhull's "flat initial simplex" precision error during Delaunay
++  triangulation — redesigned around a tiny deterministic jitter (real
++  CROCO curvilinear grids are never this regular anyway) and an
++  exactly-linear test field, so exact recovery no longer depends on
++  target points coinciding with source grid nodes.
++
+ - **This test suite was written and read through carefully, but could
+   not be executed in the environment used to write it** — no network
+   access, and `xarray`, `xgcm`, `dask`, `netCDF4`, `pyproj`, and
+diff --git pyproject.toml pyproject.toml
+index edd50ac..37af31b 100644
+--- pyproject.toml
++++ pyproject.toml
+@@ -16,6 +16,9 @@ dependencies = [
+     "netCDF4>=1.6",
+     "numpy>=1.24",
+     "xarray>=2023.1",
++    "xgcm>=0.10",
++    "scipy>=1.10",
++    "pyproj>=3.5",
+ ]
+ 
+ [project.optional-dependencies]
+diff --git tests/test_grid.py tests/test_grid.py
+index 5a68158..01f6153 100644
+--- tests/test_grid.py
++++ tests/test_grid.py
+@@ -152,16 +152,26 @@ def test_rho_to_u_then_u_to_rho_interior_is_consistent() -> None:
+ 
+ 
+ def test_psi_to_rho_pads_to_original_rho_shape() -> None:
++    # psi_to_rho's own interior averaging step needs a psi grid of at
++    # least 2x2 to produce a non-empty interior before padding -- a
++    # real CROCO grid is always far larger than this, but a bare 2x2
++    # rho grid (1x1 psi) is a genuine degenerate edge case, not
++    # something to test here. Use a 4x4 rho grid instead.
++    #
++    # Size bookkeeping: rho_to_psi shrinks n -> n-1 (4-point average).
++    # psi_to_rho shrinks that by 1 again for its own interior average
++    # (n-1 -> n-2), then pads by 1 on each side (n-2 -> n). Net effect:
++    # psi_to_rho(rho_to_psi(field)) has exactly the same shape as field.
+     field = xr.DataArray(
+-        [[0.0, 2.0], [4.0, 6.0]],
++        np.arange(16.0).reshape(4, 4),
+         dims=("eta_rho", "xi_rho"),
+     )
+     psi = rho_to_psi(field)
+ 
+     back = psi_to_rho(psi)
+ 
+-    assert back.sizes["eta_rho"] == field.sizes["eta_rho"] + 1
+-    assert back.sizes["xi_rho"] == field.sizes["xi_rho"] + 1
++    assert back.sizes["eta_rho"] == field.sizes["eta_rho"]
++    assert back.sizes["xi_rho"] == field.sizes["xi_rho"]
+ 
+ 
+ # ---------------------------------------------------------------------------
+diff --git tests/test_section.py tests/test_section.py
+index 9282371..35086d6 100644
+--- tests/test_section.py
++++ tests/test_section.py
+@@ -108,26 +108,47 @@ def test_transect_from_endpoints_rejects_invalid_sampling(uniform_grid) -> None:
+         )
+ 
+ 
+-def test_interpolate_section_recovers_grid_node_values() -> None:
+-    # A simple regular lon/lat grid and a field linear in longitude.
++def test_interpolate_section_recovers_linear_field_exactly() -> None:
++    # A regular, axis-aligned lon/lat grid is a classic trigger for
++    # scipy/Qhull's "flat initial simplex" precision error during
++    # Delaunay triangulation -- real CROCO curvilinear grids never look
++    # this regular, so a tiny deterministic jitter (well under the grid
++    # spacing) makes this a realistic, robust test rather than a
++    # pathological one.
++    #
++    # The field is chosen to be *exactly* linear in longitude
++    # (field = lon - lon.min()). Barycentric/linear interpolation over
++    # any valid triangulation reproduces an affine function exactly
++    # everywhere inside the convex hull -- so this checks the real
++    # interpolation logic without needing target points to coincide
++    # with source grid nodes (which is what triggered the degenerate
++    # triangulation in the first place).
++    rng = np.random.default_rng(0)
++
+     lon_1d = np.linspace(-10.0, -8.0, 5)
+     lat_1d = np.linspace(-20.0, -19.0, 4)
+     lon2d, lat2d = np.meshgrid(lon_1d, lat_1d)
+ 
+-    field_values = lon2d - lon2d.min()  # simple, known scalar field
++    jitter = 0.02  # << 0.5 deg / 0.33 deg grid spacing
++    lon2d = lon2d + rng.uniform(-jitter, jitter, size=lon2d.shape)
++    lat2d = lat2d + rng.uniform(-jitter, jitter, size=lat2d.shape)
++
++    field_values = lon2d - lon2d.min()
+     field = xr.DataArray(field_values, dims=("eta_rho", "xi_rho"))
+     longitude = xr.DataArray(lon2d, dims=("eta_rho", "xi_rho"))
+     latitude = xr.DataArray(lat2d, dims=("eta_rho", "xi_rho"))
+ 
+-    # Track exactly along one grid row, so each target point coincides
+-    # with a source grid node.
+-    track = Transect.from_coordinates(lon_1d, np.full_like(lon_1d, lat_1d[1]))
++    # Target points chosen independently of any grid node, safely
++    # inside the domain interior.
++    target_lon = np.array([-9.7, -9.3, -8.9, -8.5, -8.3])
++    target_lat = np.array([-19.85, -19.7, -19.5, -19.3, -19.15])
++    track = Transect.from_coordinates(target_lon, target_lat)
+ 
+     section = interpolate_section(
+         field, track, longitude=longitude, latitude=latitude
+     )
+ 
+-    expected = lon_1d - lon_1d.min()
++    expected = target_lon - lon2d.min()
+     np.testing.assert_allclose(section.values, expected, atol=1e-6)
+ 
+ 

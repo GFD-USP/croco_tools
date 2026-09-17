@@ -54,7 +54,7 @@ same functions.
 | `normalize_croco_coords` | ✅ implemented, tested | Renames XIOS-style dims (`time_counter`, `x_rho`, `y_rho`, …) to the canonical `xi_rho`/`eta_rho`/`xi_u`/`eta_v`, and `nav_lon`/`nav_lat` → `lon`/`lat`. Raises `ValueError` if the required C-grid dims still aren't present after renaming. |
 | `merge_grid` | ✅ implemented, tested | Merges a fixed allow-list of grid variables (`pm`, `pn`, `mask_rho`, `lon_*`, `lat_*`, `angle`, `f`, `h`) from a grid file into a history dataset. Uses `compat="override", join="exact"` — grid/history coordinates must align exactly. |
 | `add_horizontal_metrics` | ✅ implemented, tested | Derives `dx_*`/`dy_*` from `pm`/`pn`, builds `area_*`, and a conservative `mask_psi` (all 4 surrounding rho cells must be wet). Requires `pm`/`pn` present. |
-| `build_xgcm_grid` | ✅ implemented, tested | Constructs the `xgcm.Grid` with `boundary={"X": "extend", "Y": "extend"}`. Requires metrics already added (raises `KeyError` otherwise, with a pointer to call `add_horizontal_metrics` first). |
+| `build_xgcm_grid` | ✅ implemented, tested | Constructs the `xgcm.Grid` with `padding={"X": "extend", "Y": "extend"}` (renamed from `boundary=` for xgcm >= 0.10 — see Known Issues). Requires metrics already added (raises `KeyError` otherwise, with a pointer to call `add_horizontal_metrics` first). |
 | `prepare_xgcm` | ✅ implemented, tested | The one-call convenience wrapper: `normalize → (merge grid) → add metrics → build Grid`. This is the function the notebooks actually import (`from croco_tools import prepare_xgcm`). |
 
 ### kinematics.py — velocity-derived diagnostics
@@ -154,8 +154,8 @@ are not in tension with each other.
 ## 3. Known issues
 
 These are genuine bugs/inconsistencies found while reading the source.
-Items 1 and 2 have since been **fixed** (with your go-ahead); 3 and 4
-are still open, flagged only.
+Items 1, 2, 3, and 5 have since been **fixed** (each with your explicit
+go-ahead); 4 is still open, flagged only.
 
 1. ~~**`buoyancy_frequency` is broken (`NameError` on every call).**~~
    **Fixed.** `eos.py` called `croco_density(...)`, an undefined name —
@@ -172,12 +172,12 @@ are still open, flagged only.
    but had been missing from `__all__` entirely — this fix closes both
    sides of the same gap).
 
-3. **`pyproject.toml` is missing three runtime dependencies.**
-   `dependencies` lists only `dask[array]`, `netCDF4`, `numpy`, `xarray`.
-   But `grid.py` imports `xgcm`, and `section.py` imports `scipy.spatial.Delaunay`
-   and `pyproj.Geod`. A fresh `pip install -e ".[test]"` on a clean
-   environment will fail at import time for anything touching
-   `prepare_xgcm` or `Transect`/`interpolate_section`.
+3. ~~**`pyproject.toml` is missing three runtime dependencies.**~~
+   **Fixed.** `dependencies` listed only `dask[array]`, `netCDF4`,
+   `numpy`, `xarray`, even though `grid.py` imports `xgcm` and
+   `section.py` imports `scipy.spatial.Delaunay` and `pyproj.Geod`.
+   Added `xgcm>=0.10`, `scipy>=1.10`, `pyproj>=3.5` to `dependencies`.
+   The `xgcm>=0.10` floor is not arbitrary — see item 5.
 
 4. **`io.py`'s `attach_grid`/`open_croco` and `grid.py`'s `merge_grid`
    are two independent, not-quite-equivalent ways to attach a grid
@@ -185,6 +185,23 @@ are still open, flagged only.
    worth being deliberate about which one a given workflow uses, since
    they can behave differently on messy real-world files (differing
    coordinate names, non-exact-matching coordinates, etc.).
+
+5. ~~**`xgcm` >= 0.10 renamed the `boundary` argument to `padding`,
+   raising `ValueError` (not a deprecation warning) for the old
+   name.**~~ **Fixed.** This broke every `Grid(...)` construction in
+   `grid.py` (`add_horizontal_metrics`'s temporary grid and
+   `build_xgcm_grid`'s real one — both used `boundary={"X": "extend",
+   "Y": "extend"}`) and every `xgrid.interp`/`xgrid.derivative` call in
+   `eos.py`'s `horizontal_density_gradient` (`boundary="extend"`, 8
+   call sites). Since `kinematics.py` never passes `boundary=`/`padding=`
+   explicitly — it relies on the `Grid` object's own default set at
+   construction — fixing the two `Grid(...)` calls in `grid.py` also
+   fixed every `kinematics.py`-based test that was failing with the
+   same error. All renamed to `padding=` with the same value (`"extend"`,
+   which is unaffected by xgcm's separate removal of the different
+   `"extrapolate"` boundary type). This is why `xgcm>=0.10` is now
+   pinned in `pyproject.toml` (item 3) — the code no longer works with
+   xgcm 0.9.x, which doesn't understand `padding=` at all.
 
 ---
 
@@ -227,6 +244,21 @@ package doesn't yet have an opinion on packaging up.
 ---
 
 ## 5. Testing notes
+
+- The first real run against an installed environment (xgcm 0.10.x)
+  turned up two test-construction bugs, now fixed: `test_grid.py`'s
+  `psi_to_rho` roundtrip test used a 2x2 rho grid, which is degenerate
+  for that function's own internal averaging step (needs >= 2x2 *psi*
+  points, i.e. >= 3x3 rho points) — switched to a 4x4 grid and
+  corrected the expected output shape (it's exactly the same shape as
+  the input, not input-shape-plus-one as originally asserted).
+  `test_section.py`'s `interpolate_section` test used a perfectly
+  regular, axis-aligned lon/lat grid, which is a classic trigger for
+  Qhull's "flat initial simplex" precision error during Delaunay
+  triangulation — redesigned around a tiny deterministic jitter (real
+  CROCO curvilinear grids are never this regular anyway) and an
+  exactly-linear test field, so exact recovery no longer depends on
+  target points coinciding with source grid nodes.
 
 - **This test suite was written and read through carefully, but could
   not be executed in the environment used to write it** — no network

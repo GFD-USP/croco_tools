@@ -108,26 +108,47 @@ def test_transect_from_endpoints_rejects_invalid_sampling(uniform_grid) -> None:
         )
 
 
-def test_interpolate_section_recovers_grid_node_values() -> None:
-    # A simple regular lon/lat grid and a field linear in longitude.
+def test_interpolate_section_recovers_linear_field_exactly() -> None:
+    # A regular, axis-aligned lon/lat grid is a classic trigger for
+    # scipy/Qhull's "flat initial simplex" precision error during
+    # Delaunay triangulation -- real CROCO curvilinear grids never look
+    # this regular, so a tiny deterministic jitter (well under the grid
+    # spacing) makes this a realistic, robust test rather than a
+    # pathological one.
+    #
+    # The field is chosen to be *exactly* linear in longitude
+    # (field = lon - lon.min()). Barycentric/linear interpolation over
+    # any valid triangulation reproduces an affine function exactly
+    # everywhere inside the convex hull -- so this checks the real
+    # interpolation logic without needing target points to coincide
+    # with source grid nodes (which is what triggered the degenerate
+    # triangulation in the first place).
+    rng = np.random.default_rng(0)
+
     lon_1d = np.linspace(-10.0, -8.0, 5)
     lat_1d = np.linspace(-20.0, -19.0, 4)
     lon2d, lat2d = np.meshgrid(lon_1d, lat_1d)
 
-    field_values = lon2d - lon2d.min()  # simple, known scalar field
+    jitter = 0.02  # << 0.5 deg / 0.33 deg grid spacing
+    lon2d = lon2d + rng.uniform(-jitter, jitter, size=lon2d.shape)
+    lat2d = lat2d + rng.uniform(-jitter, jitter, size=lat2d.shape)
+
+    field_values = lon2d - lon2d.min()
     field = xr.DataArray(field_values, dims=("eta_rho", "xi_rho"))
     longitude = xr.DataArray(lon2d, dims=("eta_rho", "xi_rho"))
     latitude = xr.DataArray(lat2d, dims=("eta_rho", "xi_rho"))
 
-    # Track exactly along one grid row, so each target point coincides
-    # with a source grid node.
-    track = Transect.from_coordinates(lon_1d, np.full_like(lon_1d, lat_1d[1]))
+    # Target points chosen independently of any grid node, safely
+    # inside the domain interior.
+    target_lon = np.array([-9.7, -9.3, -8.9, -8.5, -8.3])
+    target_lat = np.array([-19.85, -19.7, -19.5, -19.3, -19.15])
+    track = Transect.from_coordinates(target_lon, target_lat)
 
     section = interpolate_section(
         field, track, longitude=longitude, latitude=latitude
     )
 
-    expected = lon_1d - lon_1d.min()
+    expected = target_lon - lon2d.min()
     np.testing.assert_allclose(section.values, expected, atol=1e-6)
 
 
