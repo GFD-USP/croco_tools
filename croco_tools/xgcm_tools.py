@@ -20,7 +20,7 @@ from .kinematics import (
     strain_rate,
     vorticity_at_rho,
 )
-from .stratification import (
+from .eos import (
     density_gradient_magnitude,
     horizontal_density_gradient,
 )

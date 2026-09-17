@@ -47,8 +47,8 @@ __all__ = [
     "u_to_rho",
     "vorticity_at_rho",
     "v_to_rho",
-    "croco_buoyancy_frequency",
-    "croco_density",
+    "buoyancy_frequency",
+    "density_anomaly",
     "density_gradient_magnitude",
     "horizontal_density_gradient",
 ]
